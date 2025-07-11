@@ -3,6 +3,7 @@ package blocks
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/gob"
 	"fmt"
 	"math"
 	"math/big"
@@ -27,13 +28,31 @@ func (b *Block) SetHash() {
 	b.Hash = hash[:]
 }
 
+// Serializes the block into a byte slice using gob encoding.
+// This allows the block to be easily stored in the database.
+func (b * Block) Serialize() []byte {
+	var result bytes.Buffer // Create a new buffer to hold the serialized data
+	encoder := gob.NewEncoder(&result) // Create a new gob encoder
+	err := encoder.Encode(b) // Encode the block into the buffer
+
+	// Error handling
+	if err != nil {
+		fmt.Println("Error encoding block:", err)
+		return nil // Return nil if there was an error
+	}
+
+	return result.Bytes()
+}
+
+// HELPERS
+
 // Generator function to create a new block easily.
 func NewBlock(data string, prevHash []byte) *Block {
 	block := &Block{time.Now().Unix(), []byte(data), prevHash, []byte{}, 0}
-	pow := NewProofOfWork(block) // Create a new proof of work instance
-	nonce, hash := pow.Run() // Run the proof of work algorithm
+	pow := NewProofOfWork(block) 
+	nonce, hash := pow.Run() 
 
-	block.Hash = hash // Set the block's hash
+	block.Hash = hash 
 	block.Nonce = nonce
 
 	return block
@@ -45,11 +64,21 @@ func NewGenesisBlock() *Block {
 	return NewBlock("Genesis Block", []byte{})
 }
 
+func DeserializeBlock(serializedBlock []byte) *Block {
+	var block Block
 
+	decoder := gob.NewDecoder(bytes.NewReader(serializedBlock))
+	err := decoder.Decode(&block) // Decode the serialized block into a Block struct
+	if err != nil {
+		fmt.Println("Error decoding block:", err)
+		return nil // Return nil if there was an error
+	}
+
+	return &block // Return a pointer to the decoded block
+}
 
 // PROOF OF WORK
 
-// Difficulty level for the proof of the work algorithms.
 const targetBits = 24
 
 // ProofOfWork represents the proof of work algorithm used to mine blocks in the blockchain.
@@ -61,19 +90,14 @@ type ProofOfWork struct {
 // Our proof of work creates a big int and then shifts it left by the number of bits we want to target.
 // Any valid hash must be less than the target value. The smaller the target, the less likely a hash will be valid.
 func NewProofOfWork(b *Block) *ProofOfWork {
-	target := big.NewInt(1) // Initialize target to 1
-	// Left Shift the target by (256 - targetBits) bits
-	target.Lsh(target, uint(256 - targetBits))
-
-	// Create a new ProofOfWork instance with the block and target
-	pow := &ProofOfWork{b, target}
-
+	target := big.NewInt(1) 
+	target.Lsh(target, uint(256 - targetBits)) 
+	pow := &ProofOfWork{b, target} 
 	return pow
 }
 
 
-// This function packages the block data into a byte slice that will be used to calculate the hash.
-// Nonce is the number that will be incremented until a valid hash is found.
+// Prepares data to be hashed for the proof of work algorithm.
 func (pow *ProofOfWork) prepareData(nonce int) []byte {
 	data := bytes.Join(
 		[][]byte{
@@ -85,7 +109,6 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 		},
 		[]byte{},
 	)
-
 	return data
 }
 
@@ -98,22 +121,19 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 	fmt.Printf("Mining the block containing \"%s\"\n", pow.block.Data)
 
 	for nonce < math.MaxInt64 {
-		data := pow.prepareData(nonce) // Get the data to hash
+		data := pow.prepareData(nonce) 
 		hash = sha256.Sum256(data)
-		// fmt.Printf("\r%x", hash) // Print the hash in hexadecimal format
-		hashInt.SetBytes(hash[:]) // Convert the hash to a big integer
+		hashInt.SetBytes(hash[:]) 
 
-		// Check if the hash is valid or not.
 		if hashInt.Cmp(pow.target) == -1 {
-			break; // The hash is valid, exit the loop	
+			break; 
 		} else {
-			nonce++ // Increment the nonce and try again
+			nonce++ 
 		}
 	}
 	fmt.Printf("Block mined! Nonce: %d\n\n", nonce)
 
 	return nonce, hash[:]
-
 }
 
 func IntToHex(num int64) []byte {
