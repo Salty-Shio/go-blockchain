@@ -2,12 +2,11 @@ package main
 
 import (
 	"fmt"
-
 	"github.com/Salty-Shio/go-blockchain/block"
 )
 
 func main() {
-	bc := block.NewBlockChain() // Create a new blockchain
+	bc := blocks.NewBlockChain() // Create a new blockchain
 	
 	// Add a few blocks to the blockchain
 	bc.AddBlock("If humans can only hold their breath for 10 minutes then how was Louis Armstrong able to become the first man on the moon?")
